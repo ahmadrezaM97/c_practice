@@ -1,0 +1,4 @@
+# use any “BasedOnStyle” you like, then override only the brace placement:
+BasedOnStyle: LLVM
+BreakBeforeBraces: Attach
+IndentWidth: 4
