@@ -28,21 +28,28 @@ typedef struct {
     str_t value;
 } http_header_t;
 
-typedef Vector http_header_vec_t;
+typedef struct {
+    Vector inner;
+} http_header_vec_t;
+
+size_t static inline http_header_vec_len(http_header_vec_t v) {
+    return v.inner.len;
+}
 
 http_header_vec_t static inline http_header_vec_new(Arena* a_ptr, size_t cap)
 {
-    return vector_new(a_ptr, cap, sizeof(http_header_t));
+    return (http_header_vec_t) { .inner = vector_new(a_ptr, cap, sizeof(http_header_t)) };
 }
+
 
 http_header_t static inline http_header_vec_get(http_header_vec_t vec, size_t i)
 {
-    return *(http_header_t*)vector_get(vec, i);
+    return *(http_header_t*)vector_get(vec.inner, i);
 }
 
 bool static inline http_header_vec_push(Arena* a_ptr, http_header_vec_t* v_ptr, http_header_t s)
 {
-    return vector_push(a_ptr, v_ptr, (void*)(&s));
+    return vector_push(a_ptr, &(v_ptr->inner), (void*)(&s));
 }
 
 typedef struct {

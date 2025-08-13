@@ -5,15 +5,17 @@
 #include <stdlib.h>   // malloc, free
 #include <assert.h>   // assert
 #include "log.h"
+#include "types.h"
+
 typedef struct {
-    uint8_t* ptr;
+    byte* ptr;
     size_t size;
 }Arena_Header;
 
 
 
 typedef struct {
-    uint8_t* base;
+    byte* base;
     size_t offset;
     size_t cap;
 
@@ -32,7 +34,7 @@ static inline size_t align_up(size_t x, size_t align) {
 
 static inline Arena arena_new(size_t capacity) {
     Arena a;
-    a.base = (uint8_t*)malloc(capacity);
+    a.base = malloc(capacity);
     a.cap = a.base ? capacity : 0;
     a.offset = 0;
     a.header_size = 0;
@@ -64,7 +66,7 @@ static inline void* arena_alloc_align(Arena* a, size_t size, size_t align) {
 
 
 
-    uint8_t* ptr = a->base + new_pos_byte_offset;
+    byte* ptr = a->base + new_pos_byte_offset;
     a->offset = new_pos_byte_offset + size;
 
     Arena_Header h = { .ptr = ptr, .size = size };
@@ -72,7 +74,7 @@ static inline void* arena_alloc_align(Arena* a, size_t size, size_t align) {
     return ptr;
 }
 
-static inline void* arena_realloc_align(Arena* a, uint8_t* ptr, size_t size, size_t align) {
+static inline void* arena_realloc_align(Arena* a, byte* ptr, size_t size, size_t align) {
     int header_index = -1;
     for (size_t i = 0;i < a->header_size;i++) {
         if (a->headers[i].ptr == ptr) {
@@ -81,14 +83,14 @@ static inline void* arena_realloc_align(Arena* a, uint8_t* ptr, size_t size, siz
     }
     assert(header_index != -1);
     size_t old_size = a->headers[header_index].size;
-    if (header_index == a->header_size - 1) {
+    if ((size_t)(header_index) == a->header_size - 1) {
         assert(a->offset + size - old_size < a->cap);
         a->offset += (size - old_size);
         a->headers[header_index].size = size;
         return ptr;
     }
 
-    uint8_t* new_ptr = arena_alloc_align(a, size, align);
+    byte* new_ptr = arena_alloc_align(a, size, align);
     assert(new_ptr != NULL);
     memcpy(ptr, new_ptr, old_size);
     return new_ptr;
@@ -96,7 +98,7 @@ static inline void* arena_realloc_align(Arena* a, uint8_t* ptr, size_t size, siz
 }
 
 
-static inline void* arena_realloc(Arena* a, uint8_t* ptr, size_t size) {
+static inline void* arena_realloc(Arena* a, byte* ptr, size_t size) {
     return arena_realloc_align(a, ptr, size, _Alignof(max_align_t));
 }
 

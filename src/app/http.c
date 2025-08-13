@@ -13,7 +13,7 @@
 
 
 bool file_write(Arena* arena_ptr, str_t content, str_t file_path) {
-    char* path = str_to_char_ptr(arena_ptr, file_path);
+    byte* path = str_to_char_ptr(arena_ptr, file_path);
     if (path == NULL)return false;
 
     FILE* file = fopen(path, "wb");
@@ -44,7 +44,7 @@ typedef struct {
 }read_result_t;
 
 read_result_t read_file(Arena* arena_ptr, str_t file_path) {
-    char* path = str_to_char_ptr(arena_ptr, file_path);
+    byte* path = str_to_char_ptr(arena_ptr, file_path);
     if (path == NULL)return (read_result_t) { .error = true };
 
     FILE* file = fopen(path, "r");
@@ -86,9 +86,9 @@ http_response_t new_http_response(Arena* a_ptr) {
     return (http_response_t) { .headers = http_header_vec_new(a_ptr, 10) };
 }
 
-int find_header(http_header_vec_t headers, str_t key) {
-    for (size_t i = 0; i < headers.len; i++) {
-        http_header_t h = http_header_vec_get(headers, i);
+int find_header(http_header_vec_t headers_vec, str_t key) {
+    for (size_t i = 0; i < http_header_vec_len(headers_vec); i++) {
+        http_header_t h = http_header_vec_get(headers_vec, i);
         if (str_cmp(h.key, key)) {
             return i;
         }
@@ -209,7 +209,7 @@ str_t http_status_message(HTTP_STATUS_CODE code) {
 
 
 str_t response_to_str(Arena* a, http_response_t* response) {
-    str_buffer_t response_buffer = new_str_buffer(a, (size_t)response->headers.len * 100 + response->body.len + 100);
+    str_buffer_t response_buffer = new_str_buffer(a, http_header_vec_len(response->headers) * 10 + response->body.len + 100);
 
     // add status line
     str_buffer_append_str(a, &response_buffer, S("HTTP/1.1 "));
@@ -219,7 +219,7 @@ str_t response_to_str(Arena* a, http_response_t* response) {
     str_buffer_append_str(a, &response_buffer, S(CRLF));
 
     // add headers
-    for (size_t i = 0; i < response->headers.len; i++) {
+    for (size_t i = 0; i < http_header_vec_len(response->headers); i++) {
         http_header_t h = http_header_vec_get(response->headers, i);
         str_buffer_append_str(a, &response_buffer, h.key);
         str_buffer_append_str(a, &response_buffer, S(": "));
@@ -251,64 +251,84 @@ void set_response_with_body(Arena* a_ptr, http_response_t* response_ptr, str_t d
 
 void handle_http_request(Arena* a_ptr, http_request_t* request_ptr, http_response_t* response_ptr) {
     str_t dir = S("./files/");
-    Str_vec urls = str_split_s(a_ptr, request_ptr->url, S("/"));
-    if (urls.len == 0) return set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_NOT_FOUND);
+    str_vec_t urls = str_split_s(a_ptr, request_ptr->url, S("/"));
+    if (strvec_len(urls) == 0) {
+        set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_NOT_FOUND);
+        return;
+    }
 
     str_t first_part = strvec_get(urls, 0);
 
     if (str_cmp(request_ptr->method, S("POST"))) {
         if (str_cmp(first_part, S("files"))) {
             str_t file_name = strvec_get(urls, 1);
-            if (urls.len != 2) return set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_INTERNAL_SERVER_ERROR);
+            if (strvec_len(urls) != 2) {
+                set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_INTERNAL_SERVER_ERROR);
+                return;
+            }
 
             str_t file_content = request_ptr->body;
             str_t file_path = str_concat(a_ptr, dir, file_name);
 
             if (!file_write(a_ptr, file_content, file_path)) {
                 LOG_ERROR("failed to write");
-                return set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_INTERNAL_SERVER_ERROR);
+                set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_INTERNAL_SERVER_ERROR);
+                return;
             }
 
-            return set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_CREATED_SUCCESSFULLY);
+            set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_CREATED_SUCCESSFULLY);
+            return;
         }
     }
 
     if (str_cmp(request_ptr->method, S("GET"))) {
         if (str_cmp(first_part, S("files"))) {
             str_t file_name = strvec_get(urls, 1);
-            if (urls.len != 2)
-                return set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_NOT_FOUND);
+            if (strvec_len(urls) != 2)
+            {
+                set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_NOT_FOUND);
+                return;
+            }
 
             str_t file_path = str_concat(a_ptr, dir, file_name);
             read_result_t result = read_file(a_ptr, file_path);
-            if (result.doesnt_exist)
-                return set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_NOT_FOUND);
+            if (result.doesnt_exist) {
+                set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_NOT_FOUND);
+                return;
+            }
 
             if (result.error) {
                 LOG_ERROR("failed read file");
-                return set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_INTERNAL_SERVER_ERROR);
+                set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_INTERNAL_SERVER_ERROR);
+                return;
             }
-            return set_response_with_body(
+            set_response_with_body(
                 a_ptr,
                 response_ptr,
                 result.content,
                 S("application/octet-stream"),
                 HTTP_STATUS_OK);
+            return;
         }
 
 
         if (str_cmp(first_part, S("echo"))) {
             str_t text = strvec_get(urls, 1);
-            if (urls.len != 2) {
-                return set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_NOT_FOUND);
+            if (strvec_len(urls) != 2) {
+                set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_NOT_FOUND);
+                return;
             }
 
-            return set_response_with_body(a_ptr, response_ptr, str_trim(text), S("text/plain"), HTTP_STATUS_OK);
+            set_response_with_body(a_ptr, response_ptr, str_trim(text), S("text/plain"), HTTP_STATUS_OK);
+            return;
         }
 
         if (str_cmp(first_part, S("user-agent"))) {
             int index = find_header(request_ptr->headers, S("User-Agent"));
-            if (index == -1) return set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_BAD_REQUEST);
+            if (index == -1) {
+                set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_BAD_REQUEST);
+                return;
+            }
 
 
             http_header_t h = http_header_vec_get(request_ptr->headers, index);
@@ -317,27 +337,29 @@ void handle_http_request(Arena* a_ptr, http_request_t* request_ptr, http_respons
             http_header_vec_push(a_ptr, &response_ptr->headers, (http_header_t) { .key = S("Content-Type"), .value = S("text/plain") });
             http_header_vec_push(a_ptr, &response_ptr->headers, (http_header_t) { .key = S("Content-Length"), .value = int_to_str(a_ptr, (int)user_agent.len) });
 
-            return set_response_with_body(a_ptr, response_ptr, str_trim(user_agent), S("text/plain"), HTTP_STATUS_OK);
+            set_response_with_body(a_ptr, response_ptr, str_trim(user_agent), S("text/plain"), HTTP_STATUS_OK);
+            return;
         }
 
     }
 
-    return  set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_NOT_FOUND);
+    set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_NOT_FOUND);
+    return;
 }
 
 
 
 bool parse_HTTP_headers(Arena* a_ptr, str_t requestheader_str, http_request_t* http_request_ptr) {
-    Str_vec rows = str_split_s(a_ptr, requestheader_str, S(CRLF));
+    str_vec_t rows = str_split_s(a_ptr, requestheader_str, S(CRLF));
 
-    Str_vec first_row = str_split_s(a_ptr, strvec_get(rows, 0), S(" "));
+    str_vec_t first_row = str_split_s(a_ptr, strvec_get(rows, 0), S(" "));
 
     http_request_ptr->method = strvec_get(first_row, 0);
     http_request_ptr->url = strvec_get(first_row, 1);
     http_request_ptr->version = strvec_get(first_row, 2);
 
-    for (size_t i = 1; i < rows.len; i++) {
-        Str_vec header_parts = str_split_s(a_ptr, strvec_get(rows, i), S(":"));
+    for (size_t i = 1; i < strvec_len(rows); i++) {
+        str_vec_t header_parts = str_split_s(a_ptr, strvec_get(rows, i), S(":"));
 
         http_header_t h = { .key = str_trim(strvec_get(header_parts, 0)), .value = str_trim(strvec_get(header_parts, 1)) };
 

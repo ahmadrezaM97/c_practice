@@ -7,6 +7,7 @@
 #include <ctype.h>
 #include <math.h>
 #include "str.h"
+#include "types.h"
 
 str_t str_copy(Arena* a, str_t src)
 {
@@ -16,7 +17,7 @@ str_t str_copy(Arena* a, str_t src)
 
     assert(src.data != NULL);
 
-    char* data = arena_alloc_align(a, src.len, _Alignof(char));
+    byte* data = arena_alloc_align(a, src.len, _Alignof(byte));
     if (data == NULL)
         return res;
     memcpy(data, src.data, src.len);
@@ -37,7 +38,7 @@ static inline int min_int(int a, int b)
     return a < b ? a : b;
 }
 
-str_t str_new(Arena* a, const char* s)
+str_t str_new(Arena* a, const byte* s)
 {
     str_t res = { .data = NULL, .len = 0 };
     if (s == NULL)
@@ -46,7 +47,7 @@ str_t str_new(Arena* a, const char* s)
     // precondition -> s != NULL
     res.len = strlen(s);
 
-    char* dst = arena_alloc_align(a, res.len, _Alignof(char));
+    byte* dst = arena_alloc_align(a, res.len, _Alignof(char));
     if (!dst)
         return res;
     memcpy(dst, s, res.len);
@@ -70,7 +71,7 @@ str_t str_concat(Arena* a, str_t s1, str_t s2)
 
     size_t total = s1.len + s2.len;
 
-    char* dst = arena_alloc_align(a, total, _Alignof(char));
+    byte* dst = arena_alloc_align(a, total, _Alignof(char));
     if (!dst)
         return res;
     res.data = dst;
@@ -122,7 +123,7 @@ str_buffer_t new_str_buffer(Arena* a, size_t cap) {
     str_buffer_t res = { .data = NULL, .len = 0, .cap = 0 };
     if (cap == 0)
         return res;
-    char* ptr = arena_alloc_align(a, cap, _Alignof(char));
+    byte* ptr = arena_alloc_align(a, cap, _Alignof(char));
     if (ptr == NULL)
         return res;
     res.data = ptr;
@@ -135,7 +136,7 @@ void str_buffer_append_char(Arena* a, str_buffer_t* b, char c) {
     if (b->len + 1 > b->cap) {
         size_t new_cap = b->cap > 0 ? b->cap * 2 : 1;
         while (new_cap < b->len + 1) new_cap *= 2;
-        char* new_data = arena_realloc_align(a, b->data, new_cap, _Alignof(char));
+        byte* new_data = arena_realloc_align(a, b->data, new_cap, _Alignof(char));
         assert(new_data != NULL);
         b->data = new_data;
         b->cap = new_cap;
@@ -149,7 +150,7 @@ void str_buffer_append_str(Arena* a, str_buffer_t* b, str_t s) {
     if (b->len > b->cap - s.len) {
         size_t new_cap = b->cap > 0 ? b->cap * 2 : 1;
         while (b->len > new_cap - s.len) new_cap *= 2;
-        char* new_data = arena_realloc_align(a, b->data, new_cap, _Alignof(char));
+        byte* new_data = arena_realloc_align(a, b->data, new_cap, _Alignof(char));
         assert(new_data != NULL);
         b->data = new_data;
         b->cap = new_cap;
@@ -185,8 +186,8 @@ str_t str_span(str_t s, size_t l, size_t r)
     return res;
 }
 
-char* str_to_char_ptr(Arena* a, str_t s) {
-    char* ptr = arena_alloc_align(a, s.len + 1, _Alignof(char));
+byte* str_to_char_ptr(Arena* a, str_t s) {
+    byte* ptr = arena_alloc_align(a, s.len + 1, _Alignof(char));
     if (ptr == NULL)return NULL;
     memcpy(ptr, s.data, s.len);
     ptr[s.len] = '\0';
@@ -208,9 +209,9 @@ str_t str_trim(str_t s)
 
 // -- strvec-...
 
-Str_vec str_split_s(Arena* a, str_t s, str_t de)
+str_vec_t str_split_s(Arena* a, str_t s, str_t de)
 {
-    Str_vec res = strvec_new(a, 1);
+    str_vec_t res = strvec_new(a, 1);
     size_t start = 0;
     size_t i = 0;
     while (i < s.len)
@@ -239,9 +240,9 @@ Str_vec str_split_s(Arena* a, str_t s, str_t de)
     return res;
 }
 
-Str_vec str_split(Arena* a, str_t s, char de)
+str_vec_t str_split(Arena* a, str_t s, char de)
 {
-    Str_vec res = strvec_new(a, 1);
+    str_vec_t res = strvec_new(a, 1);
 
     size_t l = 0;
     size_t r = 0;
