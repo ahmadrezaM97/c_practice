@@ -136,7 +136,6 @@ Str int_to_str(Arena* a, int number) {
 }
 
 
-
 StrBuffer new_str_buffer(Arena* a, size_t cap) {
     StrBuffer res = { .data = NULL, .len = 0, .cap = 0 };
     if (cap == 0)
@@ -154,10 +153,8 @@ void str_buffer_append_char(Arena* a, StrBuffer* b, char c) {
     if (b->len + 1 > b->cap) {
         size_t new_cap = b->cap > 0 ? b->cap * 2 : 1;
         while (new_cap < b->len + 1) new_cap *= 2;
-        char* new_data = arena_alloc_align(a, new_cap, _Alignof(char));
-        if (!new_data)return;
-        if (b->len > 0)memcpy(new_data, b->data, b->len);
-
+        char* new_data = arena_realloc_align(a, b->data, new_cap, _Alignof(char));
+        assert(new_data != NULL);
         b->data = new_data;
         b->cap = new_cap;
     }
@@ -166,15 +163,16 @@ void str_buffer_append_char(Arena* a, StrBuffer* b, char c) {
 }
 
 void str_buffer_append_str(Arena* a, StrBuffer* b, Str s) {
-    if (b->len + s.len > b->cap) {
+    // printf("add\n");
+    if (b->len > b->cap - s.len) {
         size_t new_cap = b->cap > 0 ? b->cap * 2 : 1;
-        while (b->len + s.len > b->cap) new_cap *= 2;
-        char* new_data = arena_alloc_align(a, new_cap, _Alignof(char));
-        if (!new_data)return;
-        if (b->len > 0)memcpy(new_data, b->data, b->len);
+        while (b->len > new_cap - s.len) new_cap *= 2;
+        char* new_data = arena_realloc_align(a, b->data, new_cap, _Alignof(char));
+        assert(new_data != NULL);
         b->data = new_data;
         b->cap = new_cap;
     }
+    // printf("copy\n");
     memcpy(b->data + b->len, s.data, s.len);
     b->len += s.len;
 }
@@ -203,14 +201,9 @@ void strvec_push(Arena* a, StrVec* vec, Str s)
         if (new_cap > SIZE_MAX / sizeof * vec->items)
             return;
         Str* old_ptr = vec->items;
-        Str* ptr = arena_alloc_align(a, new_cap * sizeof * vec->items, _Alignof(Str));
-        if (ptr == NULL)
-            return;
-        if (vec->len != 0)
-        {
-            memcpy(ptr, old_ptr, vec->len * sizeof * vec->items);
-        }
-        vec->items = ptr;
+        Str* new_ptr = arena_realloc_align(a, old_ptr, new_cap * sizeof(Str), _Alignof(Str));
+        assert(new_ptr != NULL);
+        vec->items = new_ptr;
         vec->cap = new_cap;
     }
     vec->items[vec->len] = s;
@@ -220,13 +213,21 @@ void strvec_push(Arena* a, StrVec* vec, Str s)
 Str str_span(Str s, size_t l, size_t r)
 {
     Str res = { .data = NULL, .len = 0 };
-    if(l >= r)
+    if (l >= r)
         return res;
 
     r = min_int(r, s.len);
     res.len = r - l;
     res.data = s.data + l;
     return res;
+}
+
+char* str_to_char_ptr(Arena* a, Str s) {
+    char* ptr = arena_alloc_align(a, s.len + 1, _Alignof(char));
+    if (ptr == NULL)return NULL;
+    memcpy(ptr, s.data, s.len);
+    ptr[s.len] = '\0';
+    return ptr;
 }
 
 Str str_trim(Str s)

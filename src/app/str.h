@@ -48,4 +48,4 @@ void str_buffer_append_str(Arena* a, StrBuffer* buffer, Str s);
 void str_buffer_append_char(Arena* a, StrBuffer* buffer, char c);
 Str str_buffer_to_str(StrBuffer buffer);
 int str_atoi(Str s);
-
+char* str_to_char_ptr(Arena* a, Str s);

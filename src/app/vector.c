@@ -21,13 +21,10 @@ bool vector_init(Arena* a, Vector* v, size_t cap, size_t elem_size) {
 
 static int vector_grow(Arena* a, Vector* v) {
   size_t new_cap = v->cap ? v->cap * 2 : 1;
-  void* new_data = arena_alloc(a, new_cap * v->elem_size);
-  if (new_data == NULL) {
-    return -1;
-  }
-  if (v->data_ptr) {
-    memcpy(new_data, v->data_ptr, v->len * v->elem_size);
-  }
+
+  char* new_data = arena_realloc(a, v->data_ptr, new_cap * v->elem_size);
+  assert(new_data != NULL);
+  
   v->data_ptr = new_data;
   v->cap = new_cap;
   return 0;

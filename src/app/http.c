@@ -7,7 +7,6 @@
 #include "http.h"
 #include "str.h"
 
-
 #define BUF_SIZE 4096
 
 
@@ -48,8 +47,7 @@ void* handle_http_connection(void* arg) {
     int fd = (int)(intptr_t)arg;
     LOG_INFO("Handling HTTP connection from client %d", fd);
 
-    Arena cnn_arena = arena_new((1 << 22)); // 4MB
-
+    Arena cnn_arena = arena_new((1 << 21)); // 2MB
 
     char remaining_byte_buf[(1 << 12)]; // 4KB
     size_t remaing_byte_len = 0;
@@ -96,10 +94,7 @@ void* handle_http_connection(void* arg) {
             {
                 str_print(str_buffer_to_str(read_bytes_buff));
                 int crlf_token_start = str_find(str_buffer_to_str(read_bytes_buff), S(CRLF_CRLF));
-                LOG_INFO("crlf_token_start: %d", crlf_token_start);
                 if (crlf_token_start != -1) {
-                    LOG_INFO("crlf_token_start: %d", crlf_token_start);
-
                     header_parsed = true;
                     parse_HTTP_headers(&cnn_arena, str_span(str_buffer_to_str(read_bytes_buff), 0, crlf_token_start), &http_request);
                     int index = find_header(http_request.headers, S("Content-Length"));
@@ -122,12 +117,9 @@ void* handle_http_connection(void* arg) {
         handle_http_request(&cnn_arena, &http_request, &http_response);
 
         Str response_str = response_to_str(&cnn_arena, &http_response);
-        for (size_t i = 0; i < response_str.len; i++) {
-            LOG_INFO("response_str.data[%zu]: %c", i, response_str.data[i]);
-        }
+
         size_t total_send = 0;
         while (total_send < response_str.len) {
-            LOG_INFO("total_send: %zu", total_send);
             ssize_t n = write(fd, response_str.data + total_send, response_str.len - total_send);
             if (n < 0) {
                 perror("write");
@@ -136,14 +128,11 @@ void* handle_http_connection(void* arg) {
             total_send += n;
         }
 
-
         size_t leftover = read_bytes_buff.len - request_end_pos;
         if (leftover > sizeof(remaining_byte_buf)) leftover = sizeof(remaining_byte_buf);
         memcpy(remaining_byte_buf, read_bytes_buff.data + request_end_pos, leftover);
         remaing_byte_len = leftover;
-        LOG_INFO("remaing_byte_len: %zu", remaing_byte_len);
         arena_rest(&cnn_arena);
-        LOG_INFO("arena_rest");
     }
 
 end_cnn:
@@ -195,7 +184,76 @@ void set_statuc_code_and_close_connection(Arena* a_ptr, HTTP_Response* response,
 }
 
 
+
+
+bool file_write(Arena* arena_ptr, Str buf, Str file_path) {
+
+    char* path = str_to_char_ptr(arena_ptr, file_path);
+    if (path == NULL)return false;
+
+    FILE* file = fopen(path, "r");
+    if (file == NULL) {
+        perror("fopen fails");
+        return false;
+    }
+    if (fprintf(file, buf.data, buf.len) == 0) {
+        return false;
+    }
+
+    return true;
+}
+
+
+Str read_file(Arena* arena_ptr, Str file_path) {
+    Str res = { .data = NULL, .len = 0 };
+    char* path = str_to_char_ptr(arena_ptr, file_path);
+    if (path == NULL)return res;
+    LOG_INFO("file addr %s", path);
+
+    FILE* file = fopen(path, "r");
+    if (file == NULL) {
+        perror("fopen fails");
+        return res;
+    }
+
+    StrBuffer str_buff = new_str_buffer(arena_ptr, (1 << 14)); // 4KB
+    char buf[1024];
+    size_t n;
+    while ((n = fread(buf, 1, 1024, file)) > 0) {
+        // printf("I read %zu bytes\n", n);
+        Str ss = { .len = n,.data = buf };
+        str_buffer_append_str(arena_ptr, &str_buff, ss);
+        // printf("end of cycle\n");
+    }
+    // printf("end", n);
+
+
+    if (ferror(file)) {
+        perror("fread");
+        goto close_file;
+    }
+
+    return str_buffer_to_str(str_buff);
+
+close_file:
+    fclose(file);
+    return res;
+}
+
+
+void set_response_body(Arena* a_ptr, HTTP_Response* response_ptr, Str data, Str content_type) {
+    HTTP_header content_length_h = { .key = S("Content-Length"), .value = int_to_str(a_ptr, (int)data.len) };
+    HTTP_header content_type_h = { .key = S("Content-Type"), .value = content_type };
+
+    vector_push(a_ptr, &response_ptr->headers, (void*)(&content_type_h));
+    vector_push(a_ptr, &response_ptr->headers, (void*)(&content_length_h));
+
+    response_ptr->body = data;
+}
+
 void handle_http_request(Arena* a_ptr, HTTP_Request* request, HTTP_Response* response_ptr) {
+    Str dir = S("./files/");
+
     if (str_cmp(request->method, S("GET"))) {
         StrVec urls = str_split_s(a_ptr, request->url, S("/"));
         if (urls.len == 0) {
@@ -203,6 +261,22 @@ void handle_http_request(Arena* a_ptr, HTTP_Request* request, HTTP_Response* res
             return;
         }
         Str first_part = strvec_get(urls, 0);
+        if (str_cmp(first_part, S("files"))) {
+            Str file_name = strvec_get(urls, 1);
+            if (urls.len != 2) {
+                set_statuc_code_and_close_connection(a_ptr, response_ptr, HTTP_STATUS_NOT_FOUND);
+                return;
+            }
+            Str file_path = str_concat(a_ptr, dir, file_name);
+            Str result = read_file(a_ptr, file_path);
+            if (result.len == 0) {
+                set_statuc_code_and_close_connection(a_ptr, response_ptr, HTTP_STATUS_INTERNAL_SERVER_ERROR);
+                return;
+            }
+            set_response_body(a_ptr, response_ptr, result, S("application/octet-stream"));
+            response_ptr->status_code = HTTP_STATUS_OK;
+            return;
+        }
 
         if (str_cmp(first_part, S("echo"))) {
             Str text = strvec_get(urls, 1);
@@ -211,14 +285,7 @@ void handle_http_request(Arena* a_ptr, HTTP_Request* request, HTTP_Response* res
                 return;
             }
 
-            HTTP_header content_type = { .key = S("Content-Type"), .value = S("text/plain") };
-            HTTP_header content_length = { .key = S("Content-Length"), .value = int_to_str(a_ptr, (int)text.len) };
-
-            vector_push(a_ptr, &response_ptr->headers, (void*)(&content_type));
-            vector_push(a_ptr, &response_ptr->headers, (void*)(&content_length));
-
-            response_ptr->body = str_trim(text);
-
+            set_response_body(a_ptr, response_ptr, str_trim(text), S("text/plain"));
             response_ptr->status_code = HTTP_STATUS_OK;
             return;
         }
@@ -245,6 +312,9 @@ void handle_http_request(Arena* a_ptr, HTTP_Request* request, HTTP_Response* res
             response_ptr->status_code = HTTP_STATUS_OK;
             return;
         }
+
+
+
     }
 
     set_statuc_code_and_close_connection(a_ptr, response_ptr, HTTP_STATUS_NOT_FOUND);
@@ -275,3 +345,5 @@ bool parse_HTTP_headers(Arena* a_ptr, Str requestheader_str, HTTP_Request* http_
 
     return true;
 }
+
+
