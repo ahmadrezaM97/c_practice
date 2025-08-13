@@ -31,7 +31,6 @@ static inline size_t align_up(size_t x, size_t align) {
 
 
 static inline Arena arena_new(size_t capacity) {
-    LOG_ERROR("capacity %d\n", capacity);
     Arena a;
     a.base = (uint8_t*)malloc(capacity);
     a.cap = a.base ? capacity : 0;
@@ -60,7 +59,7 @@ static inline double bytes_to_mb(size_t bytes) {
 
 static inline void* arena_alloc_align(Arena* a, size_t size, size_t align) {
     size_t new_pos_byte_offset = align_up(a->offset, align);
-    printf("->> %f %f %f\n", bytes_to_mb(size), bytes_to_mb(a->cap), bytes_to_mb(a->offset));
+    // printf("->> %f %f %f\n", bytes_to_mb(size), bytes_to_mb(a->cap), bytes_to_mb(a->offset));
     assert(size < a->cap - new_pos_byte_offset);
 
 
@@ -70,13 +69,11 @@ static inline void* arena_alloc_align(Arena* a, size_t size, size_t align) {
 
     Arena_Header h = { .ptr = ptr, .size = size };
     a->headers[a->header_size++] = h;
-    printf("[Add] a header ptr=%zu, size=%zu at %zu\n", h.ptr, h.size, a->header_size - 1);
+    // printf("[Add] a header ptr=%zu, size=%zu at %zu\n", h.ptr, h.size, a->header_size - 1);
     return ptr;
 }
 
 static inline void* arena_realloc_align(Arena* a, uint8_t* ptr, size_t size, size_t align) {
-    LOG_ERROR("REALLOC START");
-
     int header_index = -1;
     for (size_t i = 0;i < a->header_size;i++) {
         if (a->headers[i].ptr == ptr) {
@@ -84,10 +81,9 @@ static inline void* arena_realloc_align(Arena* a, uint8_t* ptr, size_t size, siz
         }
     }
     assert(header_index != -1);
-    printf("[GET] a header  ptr=%zu, size=%zu at %zu\n", a->headers[header_index].ptr, a->headers[header_index].size, header_index);
+    // printf("[GET] a header  ptr=%zu, size=%zu at %zu\n", a->headers[header_index].ptr, a->headers[header_index].size, header_index);
     size_t old_size = a->headers[header_index].size;
     if (a->offset - old_size == ptr - a->base) {
-        LOG_ERROR("REALLOC DONE");
         a->offset += (size - old_size);
         a->headers[header_index].size = size;
         return ptr;

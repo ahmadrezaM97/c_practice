@@ -19,7 +19,7 @@ int test_teardown(void) {
 // // Test case for HTTP_Request_to_string
 // void test_HTTP_Request_to_string_basic(void) {
 //     // Initialize a basic HTTP request
-//     HTTP_Request *req = HTTP_Request_init("GET", "/index.html", "HTTP/1.1",
+//     http_request_t *req = HTTP_Request_init("GET", "/index.html", "HTTP/1.1",
 //     "localhost:4221"); CU_ASSERT_PTR_NOT_NULL(req);
 
 //     // Convert request to string

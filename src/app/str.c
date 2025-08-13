@@ -8,9 +8,9 @@
 #include <math.h>
 #include "str.h"
 
-Str str_copy(Arena* a, Str src)
+str_t str_copy(Arena* a, str_t src)
 {
-    Str res = { .data = NULL, .len = 0 };
+    str_t res = { .data = NULL, .len = 0 };
     if (src.len == 0)
         return res;
 
@@ -27,7 +27,7 @@ Str str_copy(Arena* a, Str src)
     return res;
 }
 
-void str_print(Str s)
+void str_print(str_t s)
 {
     printf(STR_FMT "\n", STR_ARG(s));
 }
@@ -37,9 +37,9 @@ static inline int min_int(int a, int b)
     return a < b ? a : b;
 }
 
-Str str_new(Arena* a, const char* s)
+str_t str_new(Arena* a, const char* s)
 {
-    Str res = { .data = NULL, .len = 0 };
+    str_t res = { .data = NULL, .len = 0 };
     if (s == NULL)
         return res;
 
@@ -55,13 +55,13 @@ Str str_new(Arena* a, const char* s)
     return res;
 }
 
-Str str_concat(Arena* a, Str s1, Str s2)
+str_t str_concat(Arena* a, str_t s1, str_t s2)
 {
     assert(s1.len == 0 || s1.data != NULL);
     assert(s2.len == 0 || s2.data != NULL);
     assert(s1.len <= SIZE_MAX - s2.len);
 
-    Str res = { .data = NULL, .len = 0 };
+    str_t res = { .data = NULL, .len = 0 };
 
     if ((s1.len > 0 && s1.data == NULL) || (s2.len > 0 && s2.data == NULL))
         return res;
@@ -82,7 +82,7 @@ Str str_concat(Arena* a, Str s1, Str s2)
     return res;
 }
 
-bool str_cmp(Str s1, Str s2)
+bool str_cmp(str_t s1, str_t s2)
 {
     if (s1.len != s2.len)
         return false;
@@ -94,50 +94,32 @@ bool str_cmp(Str s1, Str s2)
     return true;
 }
 
-int str_find(Str s, Str sub_s)
+int str_find(str_t s, str_t sub_s)
 {
     for (size_t i = 0;i < s.len;i++) {
-        Str tmp = str_span(s, i, i + sub_s.len);
+        str_t tmp = str_span(s, i, i + sub_s.len);
         if (str_cmp(tmp, sub_s))return i;
     }
     return -1;
 }
 
-bool str_contain(Str s, Str sub_s) {
+bool str_contain(str_t s, str_t sub_s) {
     return str_find(s, sub_s) != -1;
 }
 
-StrVec strvec_new(Arena* a, size_t cap)
-{
-    StrVec res = { .items = NULL, .len = 0, .cap = 0 };
-    if (cap == 0)
-        return res;
 
-    Str* ptr = arena_alloc_align(a, cap * sizeof(Str), _Alignof(Str));
-    if (ptr == NULL)
-        return res;
-    res.items = ptr;
-    res.cap = cap;
-    return res;
-}
 
-Str strvec_get(StrVec vec, size_t i)
-{
-    assert(i < vec.len);
-    return vec.items[i];
-}
-
-Str int_to_str(Arena* a, int number) {
+str_t int_to_str(Arena* a, int number) {
     char buffer[12];
     snprintf(buffer, sizeof(buffer), "%d", number);
 
-    Str result = str_new(a, buffer);
+    str_t result = str_new(a, buffer);
     return result;
 }
 
 
-StrBuffer new_str_buffer(Arena* a, size_t cap) {
-    StrBuffer res = { .data = NULL, .len = 0, .cap = 0 };
+str_buffer_t new_str_buffer(Arena* a, size_t cap) {
+    str_buffer_t res = { .data = NULL, .len = 0, .cap = 0 };
     if (cap == 0)
         return res;
     char* ptr = arena_alloc_align(a, cap, _Alignof(char));
@@ -149,7 +131,7 @@ StrBuffer new_str_buffer(Arena* a, size_t cap) {
 }
 
 
-void str_buffer_append_char(Arena* a, StrBuffer* b, char c) {
+void str_buffer_append_char(Arena* a, str_buffer_t* b, char c) {
     if (b->len + 1 > b->cap) {
         size_t new_cap = b->cap > 0 ? b->cap * 2 : 1;
         while (new_cap < b->len + 1) new_cap *= 2;
@@ -162,7 +144,7 @@ void str_buffer_append_char(Arena* a, StrBuffer* b, char c) {
     b->len++;
 }
 
-void str_buffer_append_str(Arena* a, StrBuffer* b, Str s) {
+void str_buffer_append_str(Arena* a, str_buffer_t* b, str_t s) {
     // printf("add\n");
     if (b->len > b->cap - s.len) {
         size_t new_cap = b->cap > 0 ? b->cap * 2 : 1;
@@ -177,42 +159,23 @@ void str_buffer_append_str(Arena* a, StrBuffer* b, Str s) {
     b->len += s.len;
 }
 
-int str_atoi(Str s) {
+int str_atoi(str_t s) {
     int result = 0;
     for (size_t i = 0; i < s.len; i++) {
         result = result * 10 + (s.data[i] - '0');
     }
     return result;
 }
-Str str_buffer_to_str(StrBuffer buffer) {
-    Str res = { .data = buffer.data, .len = buffer.len };
+str_t str_buffer_to_str(str_buffer_t buffer) {
+    str_t res = { .data = buffer.data, .len = buffer.len };
     return res;
 }
 
 
-void strvec_push(Arena* a, StrVec* vec, Str s)
-{
-    if (vec->len + 1 > vec->cap)
-    {
-        assert(vec->cap < SIZE_MAX / 2);
-        size_t new_cap = vec->cap > 0 ? vec->cap * 2 : 1;
-        if (vec->cap > 0 && vec->cap > SIZE_MAX / 2)
-            return;
-        if (new_cap > SIZE_MAX / sizeof * vec->items)
-            return;
-        Str* old_ptr = vec->items;
-        Str* new_ptr = arena_realloc_align(a, old_ptr, new_cap * sizeof(Str), _Alignof(Str));
-        assert(new_ptr != NULL);
-        vec->items = new_ptr;
-        vec->cap = new_cap;
-    }
-    vec->items[vec->len] = s;
-    vec->len++;
-}
 
-Str str_span(Str s, size_t l, size_t r)
+str_t str_span(str_t s, size_t l, size_t r)
 {
-    Str res = { .data = NULL, .len = 0 };
+    str_t res = { .data = NULL, .len = 0 };
     if (l >= r)
         return res;
 
@@ -222,7 +185,7 @@ Str str_span(Str s, size_t l, size_t r)
     return res;
 }
 
-char* str_to_char_ptr(Arena* a, Str s) {
+char* str_to_char_ptr(Arena* a, str_t s) {
     char* ptr = arena_alloc_align(a, s.len + 1, _Alignof(char));
     if (ptr == NULL)return NULL;
     memcpy(ptr, s.data, s.len);
@@ -230,7 +193,7 @@ char* str_to_char_ptr(Arena* a, Str s) {
     return ptr;
 }
 
-Str str_trim(Str s)
+str_t str_trim(str_t s)
 {
     size_t l = 0;
     size_t r = s.len;
@@ -243,20 +206,21 @@ Str str_trim(Str s)
     return str_span(s, l, r);
 }
 
+// -- strvec-...
 
-StrVec str_split_s(Arena* a, Str s, Str de)
+Str_vec str_split_s(Arena* a, str_t s, str_t de)
 {
-    StrVec res = strvec_new(a, 1);
+    Str_vec res = strvec_new(a, 1);
     size_t start = 0;
     size_t i = 0;
     while (i < s.len)
     {
-        Str tmp = str_span(s, i, i + de.len);
+        str_t tmp = str_span(s, i, i + de.len);
         if (str_cmp(tmp, de))
         {
             if (start != i)
             {
-                Str v = str_span(s, start, i);
+                str_t v = str_span(s, start, i);
                 strvec_push(a, &res, v);
             }
             start = i + de.len;
@@ -268,16 +232,16 @@ StrVec str_split_s(Arena* a, Str s, Str de)
     }
     if (start < s.len)
     {
-        Str v = str_span(s, start, s.len);
+        str_t v = str_span(s, start, s.len);
         strvec_push(a, &res, v);
     }
 
     return res;
 }
 
-StrVec str_split(Arena* a, Str s, char de)
+Str_vec str_split(Arena* a, str_t s, char de)
 {
-    StrVec res = strvec_new(a, 1);
+    Str_vec res = strvec_new(a, 1);
 
     size_t l = 0;
     size_t r = 0;
@@ -291,7 +255,7 @@ StrVec str_split(Arena* a, Str s, char de)
         {
             if (l <= r)
             {
-                Str v = str_span(s, l, r);
+                str_t v = str_span(s, l, r);
                 strvec_push(a, &res, v);
             }
             l = r = i + 1;
@@ -300,7 +264,7 @@ StrVec str_split(Arena* a, Str s, char de)
 
     if (l <= r && r <= s.len)
     {
-        Str v = str_span(s, l, r);
+        str_t v = str_span(s, l, r);
         strvec_push(a, &res, v);
     }
     return res;

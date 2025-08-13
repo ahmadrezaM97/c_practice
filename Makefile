@@ -72,6 +72,7 @@ test:
 clean:
 	rm -f $(TARGET) $(patsubst %.c,%,$(TEST_SRCS))
 	rm -f src/*.o src/app/*.o tests/*.o
+	rm -f ./files/*
 
 help:
 	@echo "Targets:"

@@ -22,7 +22,7 @@ extern "C" {
 
     /* ——— Core API ——— */
 
-    bool vector_init(Arena* a, Vector* v, size_t cap, size_t elem_size);
+    Vector vector_new(Arena* a, size_t cap, size_t elem_size);
     bool vector_push(Arena* a, Vector* v, const void* elem);
     void* vector_get(Vector v, size_t index);
     void vector_erase(Vector* v, size_t index);

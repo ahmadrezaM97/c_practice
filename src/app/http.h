@@ -17,35 +17,53 @@
 
 typedef enum {
     HTTP_STATUS_OK = 200,
+    HTTP_STATUS_CREATED_SUCCESSFULLY = 201,
     HTTP_STATUS_BAD_REQUEST = 400,
     HTTP_STATUS_NOT_FOUND = 404,
     HTTP_STATUS_INTERNAL_SERVER_ERROR = 500,
-} HTTP_StatusCode;
+} HTTP_STATUS_CODE;
 
 typedef struct {
-    Str key;
-    Str value;
-} HTTP_header;
+    str_t key;
+    str_t value;
+} http_header_t;
+
+typedef Vector http_header_vec_t;
+
+http_header_vec_t static inline http_header_vec_new(Arena* a_ptr, size_t cap)
+{
+    return vector_new(a_ptr, cap, sizeof(http_header_t));
+}
+
+http_header_t static inline http_header_vec_get(http_header_vec_t vec, size_t i)
+{
+    return *(http_header_t*)vector_get(vec, i);
+}
+
+bool static inline http_header_vec_push(Arena* a_ptr, http_header_vec_t* v_ptr, http_header_t s)
+{
+    return vector_push(a_ptr, v_ptr, (void*)(&s));
+}
 
 typedef struct {
-    Str method;
-    Str url;
-    Str version;
-    Str body;
-    Vector headers;
-} HTTP_Request;
+    str_t method;
+    str_t url;
+    str_t version;
+    str_t body;
+    http_header_vec_t headers;
+} http_request_t;
 
 typedef struct {
-    HTTP_StatusCode status_code;
-    Vector headers;
-    Str body;
-} HTTP_Response;
+    HTTP_STATUS_CODE status_code;
+    http_header_vec_t headers;
+    str_t body;
+} http_response_t;
 
-Str http_status_message(HTTP_StatusCode code);
+str_t http_status_message(HTTP_STATUS_CODE code);
 
-bool parse_HTTP_headers(Arena* a, Str request_str, HTTP_Request* request);
-void handle_http_request(Arena* a, HTTP_Request* request, HTTP_Response* response);
-Str response_to_str(Arena* a, HTTP_Response* response);
+bool parse_HTTP_headers(Arena* a, str_t request_str, http_request_t* request);
+void handle_http_request(Arena* a, http_request_t* request, http_response_t* response);
+str_t response_to_str(Arena* a, http_response_t* response);
 
 
 void* handle_http_connection(void* arg);

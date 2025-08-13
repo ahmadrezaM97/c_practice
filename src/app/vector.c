@@ -7,16 +7,16 @@
 #include <unistd.h>
 #include <stdbool.h>
 
-bool vector_init(Arena* a, Vector* v, size_t cap, size_t elem_size) {
+
+Vector vector_new(Arena* a, size_t cap, size_t elem_size) {
+  Vector v = { .len = -1 };
   void* ptr = arena_alloc(a, cap * elem_size);
-  if (ptr == NULL) {
-    return false;
-  }
-  v->data_ptr = ptr;
-  v->len = 0;
-  v->cap = cap;
-  v->elem_size = elem_size;
-  return true;
+  assert(ptr != NULL);
+  v.data_ptr = ptr;
+  v.len = 0;
+  v.cap = cap;
+  v.elem_size = elem_size;
+  return v;
 }
 
 static int vector_grow(Arena* a, Vector* v) {
@@ -24,7 +24,7 @@ static int vector_grow(Arena* a, Vector* v) {
 
   char* new_data = arena_realloc(a, v->data_ptr, new_cap * v->elem_size);
   assert(new_data != NULL);
-  
+
   v->data_ptr = new_data;
   v->cap = new_cap;
   return 0;
