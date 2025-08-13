@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <errno.h>
 #include "log.h"
 #include "http.h"
 #include "str.h"
@@ -36,28 +37,31 @@ close_file:
 }
 
 
-str_t read_file(Arena* arena_ptr, str_t file_path) {
-    str_t res = { .data = NULL, .len = 0 };
+typedef struct {
+    str_t content;
+    bool error;
+    bool doesnt_exist;
+}read_result_t;
+
+read_result_t read_file(Arena* arena_ptr, str_t file_path) {
     char* path = str_to_char_ptr(arena_ptr, file_path);
-    if (path == NULL)return res;
+    if (path == NULL)return (read_result_t) { .error = true };
 
     FILE* file = fopen(path, "r");
     if (file == NULL) {
         perror("fopen fails");
-        return res;
+        if (errno == ENOENT)
+            return (read_result_t) { .doesnt_exist = true, .error = true };
+        return (read_result_t) { .error = true };
     }
 
     str_buffer_t str_buff = new_str_buffer(arena_ptr, (1 << 14)); // 4KB
     char buf[1024];
     size_t n;
     while ((n = fread(buf, 1, 1024, file)) > 0) {
-        // printf("I read %zu bytes\n", n);
         str_t ss = { .len = n,.data = buf };
         str_buffer_append_str(arena_ptr, &str_buff, ss);
-        // printf("end of cycle\n");
     }
-    // printf("end", n);
-
 
     if (ferror(file)) {
         perror("fread");
@@ -65,11 +69,11 @@ str_t read_file(Arena* arena_ptr, str_t file_path) {
     }
 
     fclose(file);
-    return str_buffer_to_str(str_buff);
+    return  (read_result_t) { .content = str_buffer_to_str(str_buff) };
 
 close_file:
     fclose(file);
-    return res;
+    return (read_result_t) { .error = true };
 }
 
 /// ----
@@ -260,7 +264,7 @@ void handle_http_request(Arena* a_ptr, http_request_t* request_ptr, http_respons
             str_t file_content = request_ptr->body;
             str_t file_path = str_concat(a_ptr, dir, file_name);
 
-            if (!file_write(a_ptr, file_content, file_path)){
+            if (!file_write(a_ptr, file_content, file_path)) {
                 LOG_ERROR("failed to write");
                 return set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_INTERNAL_SERVER_ERROR);
             }
@@ -276,15 +280,18 @@ void handle_http_request(Arena* a_ptr, http_request_t* request_ptr, http_respons
                 return set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_NOT_FOUND);
 
             str_t file_path = str_concat(a_ptr, dir, file_name);
-            str_t result = read_file(a_ptr, file_path);
-            if (result.len == 0) {
+            read_result_t result = read_file(a_ptr, file_path);
+            if (result.doesnt_exist)
+                return set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_NOT_FOUND);
+
+            if (result.error) {
                 LOG_ERROR("failed read file");
                 return set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_INTERNAL_SERVER_ERROR);
             }
             return set_response_with_body(
                 a_ptr,
                 response_ptr,
-                result,
+                result.content,
                 S("application/octet-stream"),
                 HTTP_STATUS_OK);
         }

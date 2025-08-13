@@ -36,6 +36,7 @@
     "limits": "c",
     "optional": "c",
     "ratio": "c",
-    "tuple": "c"
+    "tuple": "c",
+    "errno.h": "c"
 }
 }
