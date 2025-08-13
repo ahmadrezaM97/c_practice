@@ -69,7 +69,6 @@ static inline void* arena_alloc_align(Arena* a, size_t size, size_t align) {
 
     Arena_Header h = { .ptr = ptr, .size = size };
     a->headers[a->header_size++] = h;
-    // printf("[Add] a header ptr=%zu, size=%zu at %zu\n", h.ptr, h.size, a->header_size - 1);
     return ptr;
 }
 
@@ -81,9 +80,9 @@ static inline void* arena_realloc_align(Arena* a, uint8_t* ptr, size_t size, siz
         }
     }
     assert(header_index != -1);
-    // printf("[GET] a header  ptr=%zu, size=%zu at %zu\n", a->headers[header_index].ptr, a->headers[header_index].size, header_index);
     size_t old_size = a->headers[header_index].size;
-    if (a->offset - old_size == ptr - a->base) {
+    if (header_index == a->header_size - 1) {
+        assert(a->offset + size - old_size < a->cap);
         a->offset += (size - old_size);
         a->headers[header_index].size = size;
         return ptr;
