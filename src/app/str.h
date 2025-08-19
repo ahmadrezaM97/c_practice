@@ -66,3 +66,4 @@ void str_buffer_append_char(Arena* a, str_buffer_t* buffer, char c);
 str_t str_buffer_to_str(str_buffer_t buffer);
 int str_atoi(str_t s);
 byte* str_to_char_ptr(Arena* a, str_t s);
+str_t str_join(Arena* a_ptr, str_vec_t vec, str_t d)

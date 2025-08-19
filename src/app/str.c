@@ -119,7 +119,7 @@ str_t int_to_str(Arena* a, int number) {
 }
 
 
-str_buffer_t new_str_buffer(Arena* a, size_t cap) {
+str_buffer_t str_buffer_new(Arena* a, size_t cap) {
     str_buffer_t res = { .data = NULL, .len = 0, .cap = 0 };
     if (cap == 0)
         return res;
@@ -208,6 +208,23 @@ str_t str_trim(str_t s)
 }
 
 // -- strvec-...
+
+str_t str_join(Arena* a_ptr, str_vec_t vec, str_t d) {
+    size_t total_len = 0;
+    for (size_t i = 0;i < strvec_len(vec);i++) {
+        total_len += strvec_get(vec, i).len;
+    }
+    total_len += d.len * (strvec_len(vec) - 1);
+
+    str_buffer_t buf = str_buffer_new(a_ptr, total_len);
+    for (size_t i = 0;i < strvec_len(vec);i++) {
+        str_buffer_append_str(a_ptr, &buf, strvec_get(vec, i));
+        if (i != strvec_len(vec) - 1) {
+            str_buffer_append_str(a_ptr, &buf, d);
+        }
+    }
+    return str_buffer_to_str(buf);
+}
 
 str_vec_t str_split_s(Arena* a, str_t s, str_t de)
 {

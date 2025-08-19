@@ -12,7 +12,7 @@ SOURCES := $(wildcard $(SRCDIR)/*.c) $(wildcard $(APP_DIR)/*.c)
 # -Isrc: Add src directory to include paths for headers like "app/http.h"
 CFLAGS := -g -O0 -Wall -Wextra -Wpedantic -I$(SRCDIR)
 LDFLAGS :=
-LDLIBS := -lpthread
+LDLIBS := -lpthread -lz
 
 # Sanitizers
 SANITIZE := -fsanitize=address,undefined -fno-omit-frame-pointer

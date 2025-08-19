@@ -1,19 +1,26 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>     // write
+#include <zlib.h>
+#include <stdbool.h>
+
+
+struct node {
+    int value;
+    struct node* left;
+    struct node* right;
+};
+
+typedef struct {
+    int value;
+    tnod* left;
+    tnod* right;
+} tnod;
+
+void (*signal(int, void (*)(int)))(int);
 
 int main() {
-    FILE* fp = fopen("files/1.txt", "r"); // relative path
-    if (fp == NULL) {
-        perror("Error opening file");
-        return 1;
-    }
-    char buf[10];
-    int n = fread(buf, 1, sizeof buf, fp);
-    if (n > 1) {
-        printf("%s", buf);
-    }
-
-
-    // use the file
-    fclose(fp);
+    struct node n = { .value = 10 };
     return 0;
 }

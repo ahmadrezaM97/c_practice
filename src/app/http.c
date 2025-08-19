@@ -7,9 +7,94 @@
 #include "log.h"
 #include "http.h"
 #include "str.h"
+#include <zlib.h>
 
 #define BUF_SIZE 4096
-// ---
+
+str_t mycompress(Arena* a_ptr, str_t src) {
+    z_stream strm;
+    memset(&strm, 0, sizeof(strm));
+
+    uLongf out_cap = compressBound(src.len) + 18; // gzip overhead
+
+    byte* out_ptr = arena_alloc_align(a_ptr, out_cap, 1);
+    // Initialize gzip compression: level=default, method=deflate, windowBits=15+16 (gzip header/trailer), memLevel=8 (1..9), strategy=default
+    int ret = deflateInit2(&strm, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 15 + 16, 8, Z_DEFAULT_STRATEGY);
+    if (ret != Z_OK) {
+        LOG_ERROR("error in deflateInit2");
+        return (str_t) { 0 };
+    }
+
+    strm.next_in = (Bytef*)src.data;
+    strm.avail_in = (uInt)src.len;
+
+    strm.next_out = (Bytef*)out_ptr;
+    strm.avail_out = (uInt)out_cap;
+
+    do {
+        ret = deflate(&strm, Z_FINISH);
+        if (ret == Z_STREAM_END) break;
+        if (ret != Z_OK && ret != Z_BUF_ERROR) {
+            LOG_ERROR("deflate failed: ret=%d in=%u out=%u", ret, strm.avail_in, strm.avail_out);
+            deflateEnd(&strm);
+            return (str_t) { 0 };
+        }
+        if (strm.avail_out == 0) {
+            out_cap *= 2;
+            out_ptr = arena_realloc_align(a_ptr, out_ptr, out_cap * 2, 1);
+            assert(out_ptr != NULL);
+        }
+
+    } while (1);
+
+    if (ret != Z_STREAM_END)
+    {
+        LOG_ERROR("error in deflate");
+        deflateEnd(&strm);
+        return (str_t) { 0 };
+    }
+    deflateEnd(&strm);
+
+    return (str_t) { .data = out_ptr, .len = strm.total_out };
+}
+
+
+str_t mydecompress(Arena* a_ptr, str_t in) {
+    z_stream strm;
+    memset(&strm, 0, sizeof(strm));
+
+    int ret = inflateInit2(&strm, 15 + 32); // auto-detect zlib or gzip
+    if (ret != Z_OK) {
+        LOG_ERROR("error in inflateInit");
+        return (str_t) { 0 };
+    }
+
+    uLongf out_cap = (1 << 10); //1KB
+    byte* out_ptr = arena_alloc_align(a_ptr, out_cap, 1);
+    strm.next_in = (Bytef*)in.data;
+    strm.avail_in = in.len;
+    strm.next_out = (Bytef*)out_ptr;
+    strm.avail_out = out_cap;
+
+    do {
+        ret = inflate(&strm, Z_FINISH);
+        if (ret == Z_STREAM_END) break;
+        if (ret != Z_OK && ret != Z_BUF_ERROR) {
+            LOG_ERROR("inflate failed: ret=%d in=%u out=%u", ret, strm.avail_in, strm.avail_out);
+            inflateEnd(&strm);
+            return (str_t) { 0 };
+        }
+        if (strm.avail_out == 0) {
+            out_cap *= 2;
+            out_ptr = arena_realloc_align(a_ptr, out_ptr, out_cap * 2, 1);
+            assert(out_ptr != NULL);
+        }
+    } while (1);
+
+    inflateEnd(&strm);
+    return (str_t) { .data = out_ptr, .len = strm.total_out };
+}
+
 
 
 bool file_write(Arena* arena_ptr, str_t content, str_t file_path) {
@@ -313,6 +398,26 @@ void handle_http_request(Arena* a_ptr, http_request_t* request_ptr, http_respons
 
 
         if (str_cmp(first_part, S("echo"))) {
+
+            int index = find_header(request_ptr->headers, S("Accept-Encoding"));
+            if (index != -1) {
+                http_header_t encoding = http_header_vec_get(request_ptr->headers, (size_t)index);
+                str_vec_t encodings = str_split_s(a_ptr, encoding.value, S(","));
+
+
+                str_vec_t valid_encodings = strvec_new(a_ptr, 1);
+
+                for (size_t i = 0;i < str_vec_len(encoding);i++) {
+                    str_t encoding = strvec_get(encodings, i);
+                    if (str_cmp(encoding, S("gzip"))) strvec_push(a_ptr, &valid_encodings, encoding);
+                }
+
+                str_t valid_encodings_str = str_join(a_ptr, valid_encodings, S(", "));
+                if (strvec_len(valid_encodings) > 0)
+                    http_header_vec_push(a_ptr, response_ptr, (http_header_t) { .key = "Content-Encoding", .value = valid_encodings_str });
+                return;
+            }
+
             str_t text = strvec_get(urls, 1);
             if (strvec_len(urls) != 2) {
                 set_response_without_body(a_ptr, response_ptr, HTTP_STATUS_NOT_FOUND);

@@ -37,6 +37,7 @@
     "optional": "c",
     "ratio": "c",
     "tuple": "c",
-    "errno.h": "c"
+    "errno.h": "c",
+    "zlib.h": "c"
 }
 }
