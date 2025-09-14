@@ -34,7 +34,7 @@ str_vec_t static inline strvec_new(Arena* a_ptr, size_t cap)
 
 str_t static inline strvec_get(str_vec_t vec, size_t i)
 {
-    str_t* s = vector_get(vec.inner, i);
+    str_t* s = (str_t*)vector_get(vec.inner, i);
     return *s;
 }
 
@@ -60,10 +60,10 @@ int str_find(str_t s, str_t sub_s);
 str_t str_span(str_t s, size_t l, size_t r);
 bool str_cmp(str_t, str_t);
 str_t int_to_str(Arena* a, int number);
-str_buffer_t new_str_buffer(Arena* a, size_t cap);
+str_buffer_t str_buffer_new(Arena* a, size_t cap);
 void str_buffer_append_str(Arena* a, str_buffer_t* buffer, str_t s);
 void str_buffer_append_char(Arena* a, str_buffer_t* buffer, char c);
 str_t str_buffer_to_str(str_buffer_t buffer);
 int str_atoi(str_t s);
 byte* str_to_char_ptr(Arena* a, str_t s);
-str_t str_join(Arena* a_ptr, str_vec_t vec, str_t d)
+str_t str_join(Arena* a_ptr, str_vec_t vec, str_t d);

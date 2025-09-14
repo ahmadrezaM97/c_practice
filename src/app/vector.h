@@ -8,8 +8,8 @@
 #include <stdbool.h>
 #include "arena.h"
 
+
 #ifdef __cplusplus
-extern "C" {
 #endif
 
     /* ——— Vector type ——— */

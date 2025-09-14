@@ -14,7 +14,6 @@
 #define MAX_HEADER_NAME 64
 #define MAX_HEADER_VALUE 256
 
-
 typedef enum {
     HTTP_STATUS_OK = 200,
     HTTP_STATUS_CREATED_SUCCESSFULLY = 201,
@@ -69,7 +68,7 @@ typedef struct {
 str_t http_status_message(HTTP_STATUS_CODE code);
 
 bool parse_HTTP_headers(Arena* a, str_t request_str, http_request_t* request);
-void handle_http_request(Arena* a, http_request_t* request, http_response_t* response);
+bool handle_http_request(Arena* a, http_request_t* request, http_response_t* response);
 str_t response_to_str(Arena* a, http_response_t* response);
 
 
